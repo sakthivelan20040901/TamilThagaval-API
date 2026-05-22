@@ -28,6 +28,7 @@ DATASET_PATHS: dict[str, str] = {
     "narrinai":    os.path.join(BASE_DIR, "data", "narrinai_clean1.json"),
     "kurunthogai": os.path.join(BASE_DIR, "data", "kurunthokai_cleaned.json"),
     "ainkurunuru": os.path.join(BASE_DIR, "data", "aingurunuru_cleaned.json"),
+    "kalithogai":  os.path.join(BASE_DIR, "data", "kalithogai.json"),  # ← add this
     # "purananuru":  os.path.join(BASE_DIR, "data", "purananuru.json"),  ← future datasets
 }
 
