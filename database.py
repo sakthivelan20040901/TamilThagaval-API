@@ -28,7 +28,7 @@ DATASET_PATHS: dict[str, str] = {
     "narrinai":    os.path.join(BASE_DIR, "data", "narrinai_clean1.json"),
     "kurunthogai": os.path.join(BASE_DIR, "data", "kurunthokai_cleaned.json"),
     "ainkurunuru": os.path.join(BASE_DIR, "data", "aingurunuru_cleaned.json"),
-    "kalithogai":  os.path.join(BASE_DIR, "data", "kalithogai.json"),  # ← add this
+    "kalithogai":  os.path.join(BASE_DIR, "data", "kalithogai_cleaned.json"),  # ← add this
     # "purananuru":  os.path.join(BASE_DIR, "data", "purananuru.json"),  ← future datasets
 }
 
@@ -36,6 +36,7 @@ DATASET_PATHS: dict[str, str] = {
 # Datasets not listed here are loaded as-is.
 DATASET_TRANSFORMS: dict[str, str] = {
     "ainkurunuru": "_transform_ainkurunuru",
+    "kalithogai": "_transform_kalithogai",
     # "purananuru": "_transform_purananuru",
 }
 
