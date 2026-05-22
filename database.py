@@ -40,6 +40,7 @@ DATASET_TRANSFORMS: dict[str, str] = {
     # "purananuru": "_transform_purananuru",
 }
 
+
 # Fields searched by the full-text search endpoint.
 SEARCH_FIELDS: list[str] = [
     "poem", "poet", "topic", "note",
@@ -114,9 +115,55 @@ class TamilLiteratureDB:
                 flattened.append(poem)
         return flattened
 
+    def _transform_kalithogai(self, raw: Any) -> list[dict]:
+        """Transform Kalithogai JSON into a flat list of poem records.
+
+        Expected input formats (handled defensively):
+        1) Already-flat: list[dict] with poem fields.
+        2) Grouped: list[dict] where each group contains poems under a key
+           like 'poems', 'verses', or similar; group metadata becomes topic/note.
+        """
+        if isinstance(raw, list) and (not raw or isinstance(raw[0], dict)):
+            # Heuristic: if dicts already look like poems (contain poem text keys)
+            # just return as-is.
+            sample = raw[0] if raw else {}
+            if "poem" in sample or "poet" in sample or "poem_number" in sample:
+                return raw  # type: ignore[return-value]
+
+            flattened: list[dict] = []
+            for group in raw:
+                if not isinstance(group, dict):
+                    continue
+                group_title = (
+                    group.get("page_title")
+                    or group.get("title")
+                    or group.get("topic")
+                    or ""
+                )
+                group_note = group.get("page_note") or group.get("note") or ""
+
+                poems = (
+                    group.get("poems")
+                    or group.get("verses")
+                    or group.get("items")
+                    or []
+                )
+                for poem in poems if isinstance(poems, list) else []:
+                    if not isinstance(poem, dict):
+                        continue
+                    poem["topic"] = poem.get("topic", group_title)
+                    poem["note"] = poem.get("note", group_note)
+                    flattened.append(poem)
+
+            return flattened
+
+        # Fallback: unknown structure => no poems.
+        return []
+
     # Example stub for a future dataset with a different structure:
     # def _transform_purananuru(self, raw: list[dict]) -> list[dict]:
     #     return [{"poem_number": p["no"], **p} for p in raw]
+
 
     # -----------------------------------------------------------------------
     # Access helpers
