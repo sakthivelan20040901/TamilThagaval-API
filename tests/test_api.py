@@ -27,7 +27,7 @@ LIVE_COLLECTIONS = [
 
 
 # ---------------------------------------------------------------------------
-# Helper
+# Helpers
 # ---------------------------------------------------------------------------
 
 def get_first_poem_number(collection: str) -> str | None:
@@ -37,6 +37,14 @@ def get_first_poem_number(collection: str) -> str | None:
         return None
     first = data[0]
     return str(first.get("poem_number") or first.get("id") or "")
+
+
+def get_first_field_value(collection: str, field: str) -> str:
+    """Return the value of a field from the first poem, or empty string."""
+    data = db.datasets.get(collection, [])
+    if not data:
+        return ""
+    return data[0].get(field, "") or ""
 
 
 # ---------------------------------------------------------------------------
@@ -100,8 +108,6 @@ class TestCollectionEndpoints:
             str(client.get(f"/api/{collection}/random").json())
             for _ in range(5)
         }
-        # For collections with more than 1 poem this should vary.
-        # We just assert we got at least 1 valid response.
         assert len(results) >= 1
 
     def test_stats_returns_200(self, collection):
@@ -134,7 +140,6 @@ class TestCollectionEndpoints:
         assert body["count"] == len(body["results"])
 
     def test_search_empty_query_returns_422(self, collection):
-        """FastAPI should reject an empty q= with 422 Unprocessable Entity."""
         r = client.get(f"/api/{collection}/search?q=")
         assert r.status_code == 422
 
@@ -162,18 +167,19 @@ class TestCollectionEndpoints:
         r = client.get(f"/api/{collection}/999999")
         assert r.status_code == 404
 
+    # -----------------------------------------------------------------------
+    # Topic filter
+    # -----------------------------------------------------------------------
+
     def test_topic_filter_returns_200(self, collection):
-        # Use the topic of the first poem as a known-good filter value
-        first = db.datasets[collection][0]
-        topic = first.get("topic", "")
+        topic = get_first_field_value(collection, "topic")
         if not topic:
             pytest.skip(f"No topic field in {collection}")
         r = client.get(f"/api/{collection}/topic/{topic}")
         assert r.status_code == 200
 
     def test_topic_filter_results_all_match(self, collection):
-        first = db.datasets[collection][0]
-        topic = first.get("topic", "")
+        topic = get_first_field_value(collection, "topic")
         if not topic:
             pytest.skip(f"No topic field in {collection}")
         r = client.get(f"/api/{collection}/topic/{topic}")
@@ -181,23 +187,63 @@ class TestCollectionEndpoints:
         for poem in body["results"]:
             assert topic.lower() in poem.get("topic", "").lower()
 
+    # -----------------------------------------------------------------------
+    # Poet filter
+    # -----------------------------------------------------------------------
+
     def test_poet_filter_returns_200(self, collection):
-        first = db.datasets[collection][0]
-        poet = first.get("poet", "")
+        poet = get_first_field_value(collection, "poet")
         if not poet:
             pytest.skip(f"No poet field in {collection}")
         r = client.get(f"/api/{collection}/poet/{poet}")
         assert r.status_code == 200
 
     def test_poet_filter_results_all_match(self, collection):
-        first = db.datasets[collection][0]
-        poet = first.get("poet", "")
+        poet = get_first_field_value(collection, "poet")
         if not poet:
             pytest.skip(f"No poet field in {collection}")
         r = client.get(f"/api/{collection}/poet/{poet}")
         body = r.json()
         for poem in body["results"]:
             assert poet.lower() in poem.get("poet", "").lower()
+
+    # -----------------------------------------------------------------------
+    # Subtopic filter
+    # -----------------------------------------------------------------------
+
+    def test_subtopic_filter_returns_200(self, collection):
+        subtopic = get_first_field_value(collection, "subtopic")
+        if not subtopic:
+            pytest.skip(f"No subtopic field in {collection} — skipping")
+        r = client.get(f"/api/{collection}/subtopic/{subtopic}")
+        assert r.status_code == 200
+
+    def test_subtopic_filter_has_count_and_results(self, collection):
+        subtopic = get_first_field_value(collection, "subtopic")
+        if not subtopic:
+            pytest.skip(f"No subtopic field in {collection} — skipping")
+        r = client.get(f"/api/{collection}/subtopic/{subtopic}")
+        body = r.json()
+        assert "count"   in body
+        assert "results" in body
+        assert body["count"] == len(body["results"])
+
+    def test_subtopic_filter_results_all_match(self, collection):
+        subtopic = get_first_field_value(collection, "subtopic")
+        if not subtopic:
+            pytest.skip(f"No subtopic field in {collection} — skipping")
+        r = client.get(f"/api/{collection}/subtopic/{subtopic}")
+        body = r.json()
+        for poem in body["results"]:
+            assert subtopic.lower() in poem.get("subtopic", "").lower()
+
+    def test_subtopic_unknown_value_returns_empty(self, collection):
+        """A subtopic that doesn't exist should return 200 with count 0, not an error."""
+        r = client.get(f"/api/{collection}/subtopic/nonexistentsubtopic12345")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["count"] == 0
+        assert body["results"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +267,10 @@ class TestUnknownCollection:
 
     def test_unknown_collection_search_returns_404(self):
         r = client.get("/api/doesnotexist/search?q=test")
+        assert r.status_code == 404
+
+    def test_unknown_collection_subtopic_returns_404(self):
+        r = client.get("/api/doesnotexist/subtopic/test")
         assert r.status_code == 404
 
     def test_case_insensitive_collection_name(self):
