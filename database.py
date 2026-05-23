@@ -25,21 +25,22 @@ from fastapi import HTTPException
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 DATASET_PATHS: dict[str, str] = {
-    "narrinai":    os.path.join(BASE_DIR, "data", "narrinai_clean1.json"),
-    "kurunthogai": os.path.join(BASE_DIR, "data", "kurunthokai_cleaned.json"),
-    "ainkurunuru": os.path.join(BASE_DIR, "data", "aingurunuru_cleaned.json"),
-    "kalithogai":  os.path.join(BASE_DIR, "data", "kalithogai_cleaned.json"),  # ← add this
+    "narrinai":     os.path.join(BASE_DIR, "data", "narrinai_clean1.json"),
+    "kurunthogai":  os.path.join(BASE_DIR, "data", "kurunthokai_cleaned.json"),
+    "ainkurunuru":  os.path.join(BASE_DIR, "data", "aingurunuru_cleaned.json"),
+    "kalithogai":   os.path.join(BASE_DIR, "data", "kalithogai_cleaned.json"),
+    "tholkappiyam": os.path.join(BASE_DIR, "data", "tholkappiyam.json"),
     # "purananuru":  os.path.join(BASE_DIR, "data", "purananuru.json"),  ← future datasets
 }
 
 # Maps dataset keys to their transform method name (if any).
 # Datasets not listed here are loaded as-is.
 DATASET_TRANSFORMS: dict[str, str] = {
-    "ainkurunuru": "_transform_ainkurunuru",
-    "kalithogai": "_transform_kalithogai",
+    "ainkurunuru":  "_transform_ainkurunuru",
+    "kalithogai":   "_transform_kalithogai",
+    "tholkappiyam": "_transform_tholkappiyam",
     # "purananuru": "_transform_purananuru",
 }
-
 
 # Fields searched by the full-text search endpoint.
 SEARCH_FIELDS: list[str] = [
@@ -100,6 +101,23 @@ class TamilLiteratureDB:
     # Add a new _transform_<name> method for any new dataset that needs it.
     # -----------------------------------------------------------------------
 
+    def _transform_tholkappiyam(self, raw: list[dict]) -> list[dict]:
+        """
+        Tholkappiyam uses different field names than the other datasets.
+        Normalize them to the standard schema so all endpoints work correctly.
+        """
+        normalized = []
+        for verse in raw:
+            normalized.append({
+                "poem_number": verse.get("Verse Number"),
+                "poem":        verse.get("Verse Text", ""),
+                "topic":       verse.get("Section", ""),
+                "subtopic":    verse.get("Subtopic", ""),
+                # keep originals too so no data is lost
+                **verse,
+            })
+        return normalized
+
     def _transform_ainkurunuru(self, raw: list[dict]) -> list[dict]:
         """
         Ainkurunuru is grouped by page/topic.
@@ -116,54 +134,52 @@ class TamilLiteratureDB:
         return flattened
 
     def _transform_kalithogai(self, raw: Any) -> list[dict]:
-        """Transform Kalithogai JSON into a flat list of poem records.
-
-        Expected input formats (handled defensively):
-        1) Already-flat: list[dict] with poem fields.
-        2) Grouped: list[dict] where each group contains poems under a key
-           like 'poems', 'verses', or similar; group metadata becomes topic/note.
         """
-        if isinstance(raw, list) and (not raw or isinstance(raw[0], dict)):
-            # Heuristic: if dicts already look like poems (contain poem text keys)
-            # just return as-is.
-            sample = raw[0] if raw else {}
-            if "poem" in sample or "poet" in sample or "poem_number" in sample:
-                return raw  # type: ignore[return-value]
+        Transform Kalithogai JSON into a flat list of poem records.
 
-            flattened: list[dict] = []
-            for group in raw:
-                if not isinstance(group, dict):
+        Handles two formats:
+        1) Already-flat: list of dicts with poem fields directly.
+        2) Grouped: list of dicts where each group contains poems under
+           a key like 'poems', 'verses', etc.
+        """
+        if not isinstance(raw, list) or not raw:
+            return []
+
+        sample = raw[0] if raw else {}
+
+        # Already flat — poems are top-level records
+        if "poem" in sample or "poet" in sample or "poem_number" in sample:
+            return raw
+
+        # Grouped structure — flatten it
+        flattened: list[dict] = []
+        for group in raw:
+            if not isinstance(group, dict):
+                continue
+
+            group_title = (
+                group.get("page_title")
+                or group.get("title")
+                or group.get("topic")
+                or ""
+            )
+            group_note = group.get("page_note") or group.get("note") or ""
+
+            poems = (
+                group.get("poems")
+                or group.get("verses")
+                or group.get("items")
+                or []
+            )
+
+            for poem in poems if isinstance(poems, list) else []:
+                if not isinstance(poem, dict):
                     continue
-                group_title = (
-                    group.get("page_title")
-                    or group.get("title")
-                    or group.get("topic")
-                    or ""
-                )
-                group_note = group.get("page_note") or group.get("note") or ""
+                poem["topic"] = poem.get("topic", group_title)
+                poem["note"]  = poem.get("note",  group_note)
+                flattened.append(poem)
 
-                poems = (
-                    group.get("poems")
-                    or group.get("verses")
-                    or group.get("items")
-                    or []
-                )
-                for poem in poems if isinstance(poems, list) else []:
-                    if not isinstance(poem, dict):
-                        continue
-                    poem["topic"] = poem.get("topic", group_title)
-                    poem["note"] = poem.get("note", group_note)
-                    flattened.append(poem)
-
-            return flattened
-
-        # Fallback: unknown structure => no poems.
-        return []
-
-    # Example stub for a future dataset with a different structure:
-    # def _transform_purananuru(self, raw: list[dict]) -> list[dict]:
-    #     return [{"poem_number": p["no"], **p} for p in raw]
-
+        return flattened
 
     # -----------------------------------------------------------------------
     # Access helpers

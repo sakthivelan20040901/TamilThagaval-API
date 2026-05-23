@@ -21,7 +21,7 @@ router = APIRouter(
 
 CollectionParam = Path(
     ...,
-    description="Dataset name: narrinai | kurunthogai | ainkurunuru (or any future collection)",
+    description="Dataset name: narrinai | kurunthogai | ainkurunuru | kalithogai | tholkappiyam (or any future collection)",
     examples=["narrinai"],
 )
 
