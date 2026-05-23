@@ -21,8 +21,8 @@ router = APIRouter(
 
 CollectionParam = Path(
     ...,
-    description="Dataset name: narrinai | kurunthogai | ainkurunuru | kalithogai | tholkappiyam (or any future collection)",
-    examples=["narrinai"],
+    description="Dataset name: narrinai | kurunthogai | ainkurunuru (or any future collection)",
+    example="narrinai",
 )
 
 
@@ -97,6 +97,19 @@ def get_by_poet(
 ):
     results = db.filter_by_field(collection, "poet", poet_name)
     return {"collection": collection, "poet": poet_name, "count": len(results), "results": results}
+
+
+@router.get(
+    "/{collection}/subtopic/{subtopic_name}",
+    summary="Filter by subtopic",
+    description="Returns all poems whose subtopic field contains the given value. Useful for collections like Tholkappiyam that have section subdivisions.",
+)
+def get_by_subtopic(
+    collection: str = CollectionParam,
+    subtopic_name: str = Path(..., description="Subtopic name to filter by"),
+):
+    results = db.filter_by_field(collection, "subtopic", subtopic_name)
+    return {"collection": collection, "subtopic": subtopic_name, "count": len(results), "results": results}
 
 
 @router.get(

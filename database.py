@@ -44,7 +44,7 @@ DATASET_TRANSFORMS: dict[str, str] = {
 
 # Fields searched by the full-text search endpoint.
 SEARCH_FIELDS: list[str] = [
-    "poem", "poet", "topic", "note",
+    "poem", "poet", "topic", "subtopic", "note",
     "explanation", "mudippu", "karuthu",
 ]
 
@@ -114,7 +114,7 @@ class TamilLiteratureDB:
                 "topic":       verse.get("Section", ""),
                 "subtopic":    verse.get("Subtopic", ""),
                 # keep originals too so no data is lost
-                
+                **verse,
             })
         return normalized
 
