@@ -1,2 +1,5 @@
-# conftest.py — tells pytest that the project root is on sys.path
-# This file must exist in the tests/ folder.
+import sys
+import os
+
+# Add the project root to sys.path so `main`, `database`, `router` are importable
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
