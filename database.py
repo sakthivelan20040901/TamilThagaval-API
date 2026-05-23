@@ -114,7 +114,7 @@ class TamilLiteratureDB:
                 "topic":       verse.get("Section", ""),
                 "subtopic":    verse.get("Subtopic", ""),
                 # keep originals too so no data is lost
-                **verse,
+                
             })
         return normalized
 
